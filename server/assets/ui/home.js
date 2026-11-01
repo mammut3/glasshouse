@@ -699,8 +699,9 @@ function renderHomeWalls() {
   const choiceBox = q('home-wall-choice');
   if (choiceBox) {
     const label = { black: t('home.wall.setBlack', 'Black'), landscape: t('home.wall.setLandscape', 'Landscape'),
-      abstract: t('home.wall.setAbstract', 'Abstract'), own: t('home.wall.setOwn', 'Your own') };
-    choiceBox.innerHTML = (walls.choices || ['black', 'landscape', 'abstract', 'own']).map(name =>
+      abstract: t('home.wall.setAbstract', 'Abstract'), photos: t('home.wall.setPhotos', 'Photos'),
+      own: t('home.wall.setOwn', 'Your own') };
+    choiceBox.innerHTML = (walls.choices || ['black', 'landscape', 'abstract', 'photos', 'own']).map(name =>
       `<button type="button" class="${name === choice ? 'on' : ''}${name === getting ? ' busy' : ''}" ${busy ? 'disabled' : ''}
         aria-pressed="${name === choice}" onclick="homeWallSet('${name}')">${esc(name === getting ? t('home.wall.examplesBusy', 'Downloading…') : label[name] || name)}</button>`).join('');
   }

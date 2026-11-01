@@ -1253,8 +1253,9 @@ function glasshouseHomeRows(d) {
     r.push(head(t('home.wall.title', 'Wallpaper')));
     // Black, a picture set, or the owner's own, which are uploaded from a browser.
     var wallNames = { black: t('home.wall.setBlack', 'Black'), landscape: t('home.wall.setLandscape', 'Landscape'),
-      abstract: t('home.wall.setAbstract', 'Abstract'), own: t('home.wall.setOwn', 'Your own') };
-    var wallChoices = walls.choices || ['black', 'landscape', 'abstract', 'own'];
+      abstract: t('home.wall.setAbstract', 'Abstract'), photos: t('home.wall.setPhotos', 'Photos'),
+      own: t('home.wall.setOwn', 'Your own') };
+    var wallChoices = walls.choices || ['black', 'landscape', 'abstract', 'photos', 'own'];
     var wallNow = walls.choice || 'own';
     var wallNext = wallChoices[(wallChoices.indexOf(wallNow) + 1) % wallChoices.length];
     r.push(walls.fetching ? { label: t('home.wall.title', 'Wallpaper'), value: t('home.wall.examplesBusy', 'Downloading…') }

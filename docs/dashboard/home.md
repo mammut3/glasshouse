@@ -110,10 +110,11 @@ LG's search needs the TV online and LG's search server (`gb.nextlgsdp.com` on a 
 
 By default, Glasshouse Home uses a pure `#000` OLED black background (and leaves the TV's [screen saver](screen-savers.md) untouched). It can instead show a picture for each of four times of day: **Morning** (06:00 to 11:00), **Afternoon** (11:00 to 17:00), **Evening** (17:00 to 21:00) and **Night** (21:00 to 06:00).
 
-The **Wallpaper** section offers four choices:
+The **Wallpaper** section offers five choices:
 
 * **Black**, the default: no picture.
 * **Landscape**, a loch at four times of day, and **Abstract**, four flowing abstract pictures. A set is downloaded to the TV when it is chosen, about 820 KB, from [glasshouse-wallpapers](https://github.com/rorygallagher2024/glasshouse-wallpapers), so it adds nothing to the Glasshouse download. Only the chosen set is kept on the TV.
+* **Photos**, twenty public-domain and CC0 landscape photos from Wikimedia Commons, about 12 MB, downloaded to the TV when chosen from this fork's `photos-v1` tag (credits in its `CREDITS.md`). Rather than one for each time of day, Glasshouse Home shows each in turn, moving on every 5 minutes with a crossfade, dimmed as the time of day's picture would be.
 * **Your own**: pictures uploaded from the browser, one for each time of day. They are kept while a set or Black is chosen, and come back with **Your own**. Uploading a picture chooses **Your own**.
 
 The web dashboard's **Wallpaper** section shows the day as a strip from midnight to midnight, each time of day filled with its picture across its hours and a marker at the time now, and below it each time of day as a small Glasshouse Home: its picture behind the clock in the chosen text colour, so how readable the clock will be shows before it is on the TV. The time of day showing now is marked **Now**.

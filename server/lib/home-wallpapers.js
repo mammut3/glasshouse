@@ -1,5 +1,6 @@
 /* Home wallpapers: black, one of the sets fetched when chosen, or the owner's
- * own images uploaded from the browser, one for each time of day. None are
+ * own images uploaded from the browser, one for each time of day. The
+ * Photos set rotates instead. None are
  * packaged; with the owner's own, a time of day without one is black.
  * Kept outside assets so updates do not carry them into the rollback copy.
  * Strict ES5 for the TV's Node 0.10/0.12. */
@@ -37,10 +38,42 @@ var SETS = {
     morning: 'c8418d6a80e95c10644a2bad08b9355bea7bd337d32814e7fb298386ac3d7e56',
     afternoon: 'debe27bb99fb15cf51d82d9ad78363d6fa116f20913024d73c584182f040b3e0',
     evening: '1ccb4bbc5b176f26f643c84cdd255bac36707515093b64892630d5b3925e18d1',
-    night: '189e934db4b5aff8608110e3cd4562cb70d50c32a044a1f8c441ac924baa84a7' } }
+    night: '189e934db4b5aff8608110e3cd4562cb70d50c32a044a1f8c441ac924baa84a7' } },
+  /*
+   * Twenty public-domain and CC0 landscape photos from Wikimedia Commons,
+   * cropped to 1920x1080, kept on a tag of this fork's wallpapers branch with
+   * their credits (CREDITS.md). Rotating: Glasshouse Home shows each in turn
+   * rather than one for each time of day.
+   */
+  photos: { base: 'https://raw.githubusercontent.com/mammut3/glasshouse/photos-v1/', dir: 'photos/',
+    rotate: true, maxEach: 1536 * 1024, sums: {
+    p01: '774b17da0002095455f01ccc233cbb7ecfdd376f1de71f0a0be239b665fe2c95',
+    p02: '4f5e7b371a4db94d271f3004a4c933901aa3874dee2afd9a4bcc71fd78f61d04',
+    p03: 'cbbdc8d14faa2ac24faa676c8866932e694615dcf11eb2da8e93185efa9417e0',
+    p04: 'b013ab822a7f099eaaeaff03f930f638191afd324ce21c09bd3c3c5764534dc1',
+    p05: '53db5af4814d33a2697c3d512204d3b88881c336a5fe8e46099b2697573cbfb1',
+    p06: '9f17ce24836629f1d30adee858683e48cbe0a5143e4aab605d912c237ea2f3d6',
+    p07: '05ca74e97d87fd88563a7a507b5e208f63c1b8d1925afd34cbcc29db4043784c',
+    p08: 'e1f7462dcbd3c0d864ce785c7d155959fb0a063d4f8fb7d362d1ba5ebca98386',
+    p09: '85b485ebf3b1b3865e2247c8f552f4ebc2636b1d00271e3037fd3a149398715b',
+    p10: '519fa9b0cfab07851bf8a029196f66f3fc9ea39901585586a2528e07ae10edb0',
+    p11: 'e8c168a3e99d39950b9b06fe3d1a610f29e21197e9972936ccefef602b8a1ba8',
+    p12: 'd84071028a45800c7bf2c05268bc00ba49b816670d12e01d84615120be131a30',
+    p13: '6fdb49a9535e4451968f511b1c316f6b92f8eb410470a72cd15b29b89efb5b87',
+    p14: 'eeed73ab93768cb1bf482b07d7bf6e29c08e8c5c15ac45b7296f63693e8ad2a4',
+    p15: 'fda4b8b59ddf7cde233ddf409c61a2a765e7e87be07a30452b41103539290030',
+    p16: '7451e2693be137a534512af7be2182ae9f5cacfa44357acf207541d64d1d7b98',
+    p17: '73ef4e67c4661a76771909525a396ca52a1b300ddeb154425b866abb0c500b2f',
+    p18: '94f8195a85f24e2fa6e55688e5bc1cfa9a63456679181db3215eec94a3d95496',
+    p19: 'de5d8b26552d1c2e464dedfe66edada95e0902b96fe22e715e90eb07081f6e5b',
+    p20: 'fb361d6eac1a9c5ed7e4ea927a05bb0a073e436e96dca4d7b6d68a3c79c6aecf' } }
 };
 // own is the owner's uploads; black, no picture at all.
-var CHOICES = ['black', 'landscape', 'abstract', 'own'];
+var CHOICES = ['black', 'landscape', 'abstract', 'photos', 'own'];
+
+// A set's pictures: one for each time of day, or a rotating set's own list.
+function setKeys(name) { return SETS[name] && SETS[name].rotate ? Object.keys(SETS[name].sums) : SLOTS; }
+function rotating() { return !!(SETS[choice] && SETS[choice].rotate); }
 var choice = 'black';
 
 function init(stateDir) {
@@ -83,22 +116,25 @@ function saveChoice() {
 
 function status() {
   var slots = {}, revision = [choice];
-  SLOTS.forEach(function (key) {
+  setKeys(choice).forEach(function (key) {
     var file = image(key), st = null;
     try { if (file) st = fs.statSync(file); } catch (e) {}
     slots[key] = !!st;
     revision.push(st ? String(Number(st.mtime)) + '-' + st.size : '0');
   });
-  return { available: SLOTS.some(function (key) { return slots[key]; }),
+  var keys = Object.keys(slots);
+  return { available: keys.some(function (key) { return slots[key]; }),
     choice: choice, choices: CHOICES, fetching: fetching,
-    uploading: uploading || !!fetching, slots: slots, revision: revision.join('.') };
+    uploading: uploading || !!fetching, slots: slots, revision: revision.join('.'),
+    // A rotating set's pictures, in the order Glasshouse Home shows them.
+    rotate: rotating() ? keys.filter(function (key) { return slots[key]; }) : null };
 }
 
 function setFile(name, key) { return path.join(setsDir, name, key + '.jpg'); }
 
 // The picture for a time of day, from the chosen set or the owner's own.
 function image(key) {
-  if (SLOTS.indexOf(key) === -1 || choice === 'black') return null;
+  if (setKeys(choice).indexOf(key) === -1 || choice === 'black') return null;
   var file = choice === 'own' ? path.join(uploadsDir, key + '.jpg') : setFile(choice, key);
   try { if (fs.statSync(file).isFile()) return file; } catch (e) {}
   return null;
@@ -239,7 +275,8 @@ function choose(name, cb) {
   }
   if (!SETS[name]) return chosen();
   var dir = path.join(setsDir, name);
-  var missing = SLOTS.filter(function (key) { return sha256(setFile(name, key)) !== SETS[name].sums[key]; });
+  var missing = setKeys(name).filter(function (key) { return sha256(setFile(name, key)) !== SETS[name].sums[key]; });
+  var maxEach = SETS[name].maxEach || MAX_UPLOAD;
   if (!missing.length) return chosen();
   try { util.mkdirp(dir); } catch (e) { return cb({ ok: false, error: e.message }); }
   fetching = name;
@@ -249,17 +286,17 @@ function choose(name, cb) {
   }
   execFile('df', ['-k', dir], { timeout: 5000 }, function (err, out) {
     var free = err ? null : installer.parseDf(out);
-    if (free === null || free < missing.length * MAX_UPLOAD + 5 * 1024 * 1024) {
+    if (free === null || free < missing.length * maxEach + 5 * 1024 * 1024) {
       return failed(msg('srv.home.wallUploadSpace', 'Not enough confirmed free space for the wallpaper.'));
     }
     (function next(i) {
       if (i >= missing.length) { fetching = null; return chosen(); }
       var key = missing[i], file = setFile(name, key), staging = file + '.part';
-      fetchMod.download(SETS_BASE + SETS[name].dir + key + '.jpg', staging, {}, function (fetchError) {
+      fetchMod.download((SETS[name].base || SETS_BASE) + SETS[name].dir + key + '.jpg', staging, {}, function (fetchError) {
         if (fetchError) { util.unlinkQuiet(staging); return failed(fetchError.message); }
         fs.readFile(staging, function (readError, buf) {
           if (readError) { util.unlinkQuiet(staging); return failed(readError.message); }
-          if (buf.length > MAX_UPLOAD || crypto.createHash('sha256').update(buf).digest('hex') !== SETS[name].sums[key] || !validJpeg(buf)) {
+          if (buf.length > maxEach || crypto.createHash('sha256').update(buf).digest('hex') !== SETS[name].sums[key] || !validJpeg(buf)) {
             util.unlinkQuiet(staging);
             return failed(msg('srv.home.wallExampleBad', 'A wallpaper did not download intact. Try again later.'));
           }
@@ -282,7 +319,7 @@ function ownChosen() {
 
 function removeSet(name) {
   var dir = path.join(setsDir, name);
-  SLOTS.forEach(function (key) { util.unlinkQuiet(path.join(dir, key + '.jpg')); util.unlinkQuiet(path.join(dir, key + '.jpg.part')); });
+  setKeys(name).forEach(function (key) { util.unlinkQuiet(path.join(dir, key + '.jpg')); util.unlinkQuiet(path.join(dir, key + '.jpg.part')); });
   try { fs.rmdirSync(dir); } catch (e) {}
 }
 
