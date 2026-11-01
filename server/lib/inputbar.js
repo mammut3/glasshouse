@@ -18,9 +18,10 @@
 var luna = require('./luna');
 
 var APP = 'com.tvweb.inputbar';
-// After a close, so a press that closed it is not met by a launch at once.
-var AFTER_CLOSE_MS = 2000;
-var AFTER_START_MS = 30000;
+// After a close. Short: a press 1.5 s after a close found it not yet loaded
+// again and took 1.1 s, and a hidden preload never gets in the way.
+var AFTER_CLOSE_MS = 300;
+var AFTER_START_MS = 5000;
 var AFTER_SWITCH_ON_MS = 5000;
 // A launch refused this many times in a row (the app removed, say) stops the
 // preloading until the server starts again.
@@ -52,7 +53,7 @@ function ensure() {
     failures++;
     console.log('inputbar: preload refused: ' + ((r && (r.errorText || r.errorCode)) || 'no answer') +
       (failures >= MAX_FAILURES ? '; not trying again' : ''));
-    if (failures < MAX_FAILURES) schedule(AFTER_CLOSE_MS * failures * 5);
+    if (failures < MAX_FAILURES) schedule(2000 * failures * 5);
   });
 }
 

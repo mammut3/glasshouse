@@ -14,6 +14,8 @@ html,body{width:1920px;height:1080px;background:transparent;overflow:hidden;colo
   -webkit-transition:opacity .18s ease-out,-webkit-transform .18s ease-out;transition:opacity .18s ease-out,transform .18s ease-out}
 .on #shade,.on #bar{opacity:1}
 .on #bar{-webkit-transform:none;transform:none}
+/* Opening is at once: only closing fades. */
+.on #shade,.on #bar{-webkit-transition:none;transition:none}
 #tiles{display:inline-block;white-space:nowrap;font-size:0}
 /* A logo on its brand's colour; the input in focus full and ringed, the rest dimmed. */
 .tile{display:inline-block;vertical-align:top;position:relative;width:300px;height:128px;margin:0 14px;border-radius:24px;
@@ -49,6 +51,9 @@ html,body{width:1920px;height:1080px;background:transparent;overflow:hidden;colo
   var BASE = 'http://localhost:' + PORT;
   var KEY = { left: 37, right: 39, ok: 13, back: 461, backspace: 8 };
   var IDLE_MS = 6000;
+  // On the input already on screen there is nothing to switch to, so the bar
+  // goes sooner.
+  var IDLE_ON_NOW_MS = 3000;
   // A press landing on another input switches to it this long after, as
   // LG's input bar does, unless another press moves on first.
   var SWITCH_MS = 1000;
@@ -96,7 +101,8 @@ html,body{width:1920px;height:1080px;background:transparent;overflow:hidden;colo
   }
   function stillThere() {
     clearTimeout(idle);
-    idle = setTimeout(close, IDLE_MS);
+    var onNow = list[focus] && list[focus].port === onPort;
+    idle = setTimeout(close, onNow ? IDLE_ON_NOW_MS : IDLE_MS);
   }
 
   // The inputs as Glasshouse Home's Inputs row has them: its order, less the
