@@ -57,6 +57,7 @@ var servicesModule = require('./lib/services');
 var preload = require('./lib/preload');
 var quickAccess = require('./lib/quickaccess');
 var remoteKeys = require('./lib/remotekeys');
+var inputBar = require('./lib/inputbar');
 var clockFormat = require('./lib/clock');
 var homeScreen = require('./lib/homescreen');
 /*
@@ -541,7 +542,7 @@ iconServer.init({ config: CONFIG, apps: appsModule });
 servicesModule.init({ stateDir: __dirname });
 preload.init({ luna: luna, stateDir: __dirname });
 quickAccess.init({ luna: luna, inputNames: telemetry.inputNameMap });
-remoteKeys.init({ luna: luna, subscription: lunaTransport.Subscription, services: servicesModule, inputNames: telemetry.inputNameMap, stateDir: __dirname,
+remoteKeys.init({ luna: luna, onInputBarKey: function () { inputBar.poke(); }, subscription: lunaTransport.Subscription, services: servicesModule, inputNames: telemetry.inputNameMap, stateDir: __dirname,
   homeAssistant: function () { return !!(CONFIG.mqtt && CONFIG.mqtt.enabled && CONFIG.mqtt.host); } });
 homeScreen.init({ luna: luna, config: CONFIG, inputNames: telemetry.inputNameMap, stateDir: __dirname, webosVersion: telemetry.detectWebosVersion() });
 // webOS 10's layout is an overlay mount, gone after a restart of the TV.
@@ -1970,6 +1971,16 @@ if (!CLI_MODE) {
   // A C5 (webOS 10.3) has every app's preloading enabled again at each switch-on.
   liveState.state.onChange(function (ev) {
     if (ev.group === 'power' && ev.key === 'systemOn' && ev.value === true) preload.resend();
+  });
+  // The input bar is preloaded while a remote key opens it and the TV is on.
+  inputBar.init({
+    luna: luna,
+    wanted: remoteKeys.opensInputBar,
+    on: function () { return (liveState.state.snapshot().power || {}).systemOn !== false; }
+  });
+  inputBar.start();
+  liveState.state.onChange(function (ev) {
+    if (ev.group === 'power' && ev.key === 'systemOn' && ev.value === true) inputBar.poke();
   });
 
   telemetry.detectDeviceInfo(function() {

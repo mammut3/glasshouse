@@ -91,6 +91,8 @@ var LIVE_TV = 'com.webos.app.livetv';
 // LG's Home, which opens Glasshouse Home while that holds its place. Not a tile
 // on the Home screen, so not among the apps, and offered on its own.
 var HOME_APP = 'com.webos.app.home';
+// Glasshouse's input bar, an overlay app (assets/inputbar-app/).
+var INPUT_BAR = 'com.tvweb.inputbar';
 // The separate app earlier Glasshouse Home builds installed, now removed; a key
 // still set to it opened nothing, and is moved to HOME_APP at start.
 var LEGACY_HOME_APP = 'com.tvweb.home';
@@ -224,6 +226,8 @@ var KEYS = [
 ];
 
 var lunaFn = null;
+// Told when a key is set to open the input bar (lib/inputbar.js preloads it).
+var keySetFn = null;
 var inputNames = null;
 var stateDir = '/var/lib/tvweb';
 var filtersDir = LG_FILTERS_DIR;
@@ -241,6 +245,7 @@ var reapplyDelayMs = 1000;
 function init(opts) {
   opts = opts || {};
   lunaFn = opts.luna || null;
+  keySetFn = typeof opts.onInputBarKey === 'function' ? opts.onInputBarKey : null;
   inputNames = opts.inputNames || {};
   if (opts.stateDir) stateDir = opts.stateDir;
   filtersDir = opts.filtersDir || LG_FILTERS_DIR;
@@ -394,6 +399,18 @@ function filterSource() {
     '    }',
     '}',
     '',
+    // Whether the input bar is the window in front, by the compositor's own
+    // helpers as LG's appLaunch.js uses them on webOS 6. Where they are missing
+    // the bar is opened again, and the page moves on at the relaunch instead.
+    'function glasshouseBarInFront() {',
+    '    try {',
+    '        return typeof global !== "undefined" && typeof global.isForegroundApp === "function" &&',
+    '            typeof global.sendKeyToFocusWindow === "function" && global.isForegroundApp(' + JSON.stringify(INPUT_BAR) + ') === true;',
+    '    } catch (e) {',
+    '        return false;',
+    '    }',
+    '}',
+    '',
     'function glasshousePowerChanged(payload) {',
     '    try {',
     '        var r = typeof payload === "string" ? JSON.parse(payload) : payload;',
@@ -491,6 +508,11 @@ function filterSource() {
     '        } else if (id === ' + JSON.stringify(SCREEN_OFF) + ') {',
     '            if (!pressed && glasshouseScreenOffArmed) console.info("glasshouse keyfilter: key", key, "turns the screen off");',
     '            glasshouseScreenOffKey(pressed, autoRepeat);',
+    '        } else if (id === ' + JSON.stringify(INPUT_BAR) + ' && glasshouseBarInFront()) {',
+    // Relaunching a window already on screen redraws it, which shows as a
+    // flash, so a further press goes to the bar as Right (Linux KEY_RIGHT 106,
+    // as LG's appLaunch.js names it), which moves it to the next input.
+    '            if (!autoRepeat) global.sendKeyToFocusWindow(Qt.Key_Right, pressed, 106);',
     '        } else if (pressed && !autoRepeat && id) {',
     '            console.info("glasshouse keyfilter: key", key, "opens", id);',
     // Home opened as the Home key opens it, so Glasshouse Home opens as Home.
@@ -1204,6 +1226,13 @@ function homeChoices(native) {
   return native ? [] : [{ id: HOME_APP, title: msg('srv.remoteKeys.home', 'Home'), kind: 'app' }];
 }
 
+// The input bar as a choice, once its app is on the TV. It has no tile, so it
+// is not among appChoices, and only the JavaScript filter steps it on.
+function barChoices(apps, native) {
+  var have = !native && (apps || []).some(function (a) { return a && a.id === INPUT_BAR; });
+  return have ? [{ id: INPUT_BAR, title: msg('srv.remoteKeys.inputBar', 'Input bar'), kind: 'app' }] : [];
+}
+
 // The apps a key can open: those on the Home screen, by title.
 function appChoices(apps) {
   var seen = {};
@@ -1248,7 +1277,7 @@ function describeKeys(keys, inChain, cb, native) {
       var inputs = inputChoices();
       var media = native ? [] : actionChoices().concat(mediaChoices());
       var cc = country();
-      switchers.concat(inputs, actionChoices(), mediaChoices(), homeChoices(false)).forEach(function (c) { titles[c.id] = c.title; });
+      switchers.concat(inputs, actionChoices(), mediaChoices(), homeChoices(false), barChoices(apps, false)).forEach(function (c) { titles[c.id] = c.title; });
       var out = keys.map(function (k) {
         var set = Object.prototype.hasOwnProperty.call(map, k.key);
         var id = set ? map[k.key] : null;
@@ -1269,7 +1298,7 @@ function describeKeys(keys, inChain, cb, native) {
       });
       cb({
         ok: true, supported: true, keys: out,
-        choices: switchers.concat(media, inputs, homeChoices(native), appChoices(apps)),
+        choices: switchers.concat(media, inputs, homeChoices(native), barChoices(apps, native), appChoices(apps)),
         inChain: inChain
       });
     });
@@ -1311,14 +1340,17 @@ function setOfferedKey(def, action, id, kind, cb) {
     listApps(function (apps) {
       if (!apps) return cb({ ok: false, error: msg('srv.remoteKeys.noApps', 'Could not read the TV\'s apps. Try again in a moment.') });
       var media = kind === 'filter' ? actionChoices().concat(mediaChoices()) : [];
-      var allowed = switchers.concat(media, inputChoices(), homeChoices(kind !== 'filter'), appChoices(apps))
+      var allowed = switchers.concat(media, inputChoices(), homeChoices(kind !== 'filter'), barChoices(apps, kind !== 'filter'), appChoices(apps))
         .some(function (c) { return c.id === id; });
       if (id === HOME_ASSISTANT && !reported(def.key)) {
         return cb({ ok: false, error: msg('srv.remoteKeys.notReported', 'Home Assistant does not receive this key\'s presses') });
       }
       if (!allowed) return cb({ ok: false, error: msg('srv.remoteKeys.unknownApp', 'That app is not on this TV') });
       map[def.key] = id;
-      save(map, cb);
+      save(map, function (r) {
+        if (r && r.ok && id === INPUT_BAR && keySetFn) keySetFn();
+        cb(r);
+      });
     });
   });
 }
@@ -1474,8 +1506,15 @@ function restoreFilter(cb) {
   });
 }
 
+// Whether a key is set to open the input bar, which lib/inputbar.js keeps loaded.
+function opensInputBar() {
+  var map = readMap();
+  return Object.keys(map).some(function (k) { return map[k] === INPUT_BAR; });
+}
+
 module.exports = {
   init: init,
+  opensInputBar: opensInputBar,
   getRemoteKeys: getRemoteKeys,
   setRemoteKey: setRemoteKey,
   setHome: setHome,
